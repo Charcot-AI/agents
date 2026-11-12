@@ -10,7 +10,19 @@ pytest.importorskip("marimba")
 
 from marimba.decision import Decision  # noqa: E402
 
+from livekit.agents import Plugin  # noqa: E402
+from livekit.plugins import marimba  # noqa: E402
+
 pytestmark = pytest.mark.unit
+
+
+def test_plugin_registration():
+    plugin = next(p for p in Plugin.registered_plugins if p.title == "livekit.plugins.marimba")
+    assert plugin.version == marimba.__version__
+    assert plugin.package == "livekit.plugins.marimba"
+    assert plugin.logger.name == "livekit.plugins.marimba"
+    assert marimba.TurnDetector is not None
+    assert marimba.TurnDetectorStream is not None
 
 
 @pytest.fixture

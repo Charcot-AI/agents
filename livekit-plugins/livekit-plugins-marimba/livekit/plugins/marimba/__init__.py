@@ -10,7 +10,10 @@ __all__ = ["TurnDetector", "TurnDetectorStream", "__version__"]
 
 
 class MarimbaPlugin(Plugin):
+    """Register Marimba's package metadata and logger with LiveKit Agents."""
+
     def __init__(self) -> None:
+        """Initialize the plugin registration metadata."""
         super().__init__(__name__, __version__, __package__, logger)
 
 
