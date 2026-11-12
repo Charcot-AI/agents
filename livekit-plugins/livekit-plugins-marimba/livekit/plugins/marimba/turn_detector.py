@@ -116,6 +116,9 @@ class TurnDetectorStream:
         self._closed = False
         self._future: asyncio.Future[TurnDetectionEvent] | None = None
         self._tasks: set[asyncio.Task[None]] = set()
+        self._pending: (
+            tuple[asyncio.Future[TurnDetectionEvent], np.ndarray[Any, Any], int] | None
+        ) = None
 
     @property
     def model(self) -> str:
@@ -186,12 +189,17 @@ class TurnDetectorStream:
             future.set_result(self._event(1.0))
             return future
         self._future = future
-        task = asyncio.create_task(
-            self._run_prediction(future, self._audio.copy(), self._sample_rate or SAMPLE_RATE)
-        )
-        self._tasks.add(task)
-        task.add_done_callback(self._tasks.discard)
+        self._pending = future, self._audio.copy(), self._sample_rate or SAMPLE_RATE
+        if not any(not task.done() for task in self._tasks):
+            task = asyncio.create_task(self._run_predictions())
+            self._tasks.add(task)
+            task.add_done_callback(self._tasks.discard)
         return future
+
+    async def _run_predictions(self) -> None:
+        while self._pending is not None:
+            pending, self._pending = self._pending, None
+            await self._run_prediction(*pending)
 
     async def _run_prediction(
         self,
@@ -217,6 +225,7 @@ class TurnDetectorStream:
         if self._future is not None and not self._future.done():
             self._future.set_result(self._event(0.0))
         self._future = None
+        self._pending = None
 
     def flush(self, reason: str | None = None) -> None:
         """Clear retained audio and cancel the pending prediction."""
@@ -238,3 +247,4 @@ class TurnDetectorStream:
         # A running model call cannot be interrupted safely in its worker thread.
         if self._tasks:
             await asyncio.gather(*self._tasks)
+            self._tasks.clear()
